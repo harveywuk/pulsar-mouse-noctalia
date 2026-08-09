@@ -193,7 +193,7 @@ local function toggleRow(key, labelText, checked, buildCmd, onSuccess)
         end, 10000)
       end,
     }),
-    ui.label({ text = labelText, flexGrow = 1 }),
+    ui.label({ key = key .. "-label", text = labelText, flexGrow = 1 }),
   })
 end
 
@@ -566,8 +566,18 @@ function render()
   panel.render(ui.scroll({ flexGrow = 1, gap = 10 }, rows))
 end
 
+-- Clears `busy` on every terminal path (all the early returns below, and
+-- the final success path at the end) - NOT on the bootstrap-resync path,
+-- which recurses into another readStatus() call that owns clearing it
+-- once that one actually finishes. Bug, found in review: onProfileChange
+-- sets busy=true then calls this expecting it to clear busy on success,
+-- but until this fix it never did on any path - after a successful
+-- profile switch the whole panel (every slider/toggle/dropdown, since
+-- they're all `enabled = not busy`) went permanently read-only, with no
+-- error shown, since nothing was ever wrong from the user's perspective.
 local function readStatus()
   if not noctalia.commandExists("pulsar-mouse") then
+    busy = false
     errorText = noctalia.tr("ui.not-installed")
     render()
     return
@@ -576,12 +586,14 @@ local function readStatus()
     `pulsar-mouse --status-json --profile {profile}`,
     function(result)
       if type(result) ~= "table" or result.timedOut or result.exitCode ~= 0 then
+        busy = false
         errorText = noctalia.tr("ui.no-mouse")
         render()
         return
       end
       local decoded = noctalia.json.decode(result.stdout or "")
       if type(decoded) ~= "table" or decoded.polling_rate == nil then
+        busy = false
         errorText = noctalia.tr("ui.no-mouse")
         render()
         return
@@ -639,6 +651,7 @@ local function readStatus()
         brightnessPct = decoded.led.brightness_percent
         breatheSpeed = decoded.led.breathe_speed
       end
+      busy = false
       render()
     end,
     10000
