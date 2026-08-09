@@ -592,7 +592,12 @@ local function readStatus()
         return
       end
       local decoded = noctalia.json.decode(result.stdout or "")
-      if type(decoded) ~= "table" or decoded.polling_rate == nil then
+      -- type(decoded.dpi) checked here too, not just polling_rate - cli.py
+      -- always emits it today so this is theoretical, but decoded.dpi.active
+      -- below would otherwise throw on a malformed response and skip
+      -- clearing `busy`, the exact failure mode the rest of this function
+      -- was just fixed to avoid.
+      if type(decoded) ~= "table" or decoded.polling_rate == nil or type(decoded.dpi) ~= "table" then
         busy = false
         errorText = noctalia.tr("ui.no-mouse")
         render()
