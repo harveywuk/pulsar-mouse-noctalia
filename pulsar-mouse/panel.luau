@@ -5,7 +5,7 @@
 -- to the mouse directly via the CLI - none of DPI/polling/LED state lives
 -- in the cached battery.json, and writes obviously can't be cached at all.
 --
--- Sliders (DPI stage, polling rate, brightness, breath speed) commit on
+-- Sliders (DPI stage, polling rate, brightness, breathe speed) commit on
 -- onDragEnd, not onChange - onChange only updates the live label as you
 -- drag, so a drag gesture doesn't fire a USB write per pixel/step crossed.
 -- DPI and polling rate are index-based sliders over their configured/
@@ -52,8 +52,8 @@ local ledEffects = {}
 local ledEffect = nil
 local brightnessPct = nil
 local brightnessPreview = nil
-local breathSpeed = nil
-local breathSpeedPreview = nil
+local breatheSpeed = nil
+local breatheSpeedPreview = nil
 local wireless = false
 local debounce = nil -- {value, min, max}
 local debouncePreview = nil
@@ -78,12 +78,12 @@ local activeTab = "sensor" -- "sensor" | "advanced" | "lighting" | "power"
 -- lets them share the one local.
 local render
 
--- Matches the GUI's own convention (see gui.py) for when breath/pulse speed
--- is relevant: the device's last LED effect in its list, whatever it's
--- actually named ("pulse" here, "breath" on other drivers) - not a literal
--- string match.
-local function breathSpeedRelevant()
-  return breathSpeed ~= nil and ledEffect == ledEffects[#ledEffects]
+-- Matches the GUI's own convention (see gui.py) for when breathe speed is
+-- relevant: the device's last LED effect in its list, checked by position
+-- rather than a literal string match, in case a future driver ever needs
+-- a different name.
+local function breatheSpeedRelevant()
+  return breatheSpeed ~= nil and ledEffect == ledEffects[#ledEffects]
 end
 
 local function pollingRateIndex()
@@ -96,7 +96,7 @@ local function pollingRateIndex()
 end
 
 -- Generic value slider (label + slider) for the four new global/per-profile
--- settings below - DPI/polling/brightness/breath speed above predate this
+-- settings below - DPI/polling/brightness/breathe speed above predate this
 -- and stay as they are (index-based lookups for the first two, already
 -- working) rather than being retrofitted for the sake of it. get/setPreview
 -- hold the live-drag value separately from the committed one, same
@@ -104,7 +104,7 @@ end
 -- `key` gives this row's label/slider a stable identity across renders -
 -- without it, Noctalia's UI reconciler matches purely by (type, position),
 -- and this panel's row list shifts constantly (the error label appearing/
--- disappearing, tabs swapping which rows are present, the breath-speed row
+-- disappearing, tabs swapping which rows are present, the breathe-speed row
 -- coming and going) - two different sliderRow() calls landing on the same
 -- structural slot across renders can end up with one's onDragEnd bound to
 -- the wrong control, so a drag on one setting silently writes another.
@@ -514,8 +514,8 @@ function render()
       end,
     }))
 
-    if breathSpeedRelevant() then
-      local shownSpeed = breathSpeedPreview or breathSpeed
+    if breatheSpeedRelevant() then
+      local shownSpeed = breatheSpeedPreview or breatheSpeed
       table.insert(rows, ui.label({
         key = "speed-label",
         text = `{noctalia.tr("ui.speed-label")} — {shownSpeed}`,
@@ -530,26 +530,26 @@ function render()
         value = shownSpeed,
         enabled = not busy,
         onChange = function(value)
-          breathSpeedPreview = math.floor(tonumber(value) or breathSpeed)
+          breatheSpeedPreview = math.floor(tonumber(value) or breatheSpeed)
           render()
         end,
         onDragEnd = function(value)
           -- Prefer the live-drag preview over onDragEnd's own `value` arg -
           -- see sliderRow()'s onDragEnd for why.
-          local target = breathSpeedPreview or math.floor(tonumber(value) or breathSpeed)
-          breathSpeedPreview = nil
-          if target == breathSpeed then
+          local target = breatheSpeedPreview or math.floor(tonumber(value) or breatheSpeed)
+          breatheSpeedPreview = nil
+          if target == breatheSpeed then
             render()
             return
           end
           busy = true
           render()
           noctalia.runAsync(
-            `pulsar-mouse --profile {profile} --breath-speed {target}`,
+            `pulsar-mouse --profile {profile} --breathe-speed {target}`,
             function(result)
               busy = false
               if type(result) == "table" and result.exitCode == 0 then
-                breathSpeed = target
+                breatheSpeed = target
                 errorText = nil
               else
                 errorText = noctalia.tr("ui.write-failed")
@@ -637,7 +637,7 @@ local function readStatus()
         ledEffects = decoded.led.effects or {}
         ledEffect = decoded.led.effect
         brightnessPct = decoded.led.brightness_percent
-        breathSpeed = decoded.led.breath_speed
+        breatheSpeed = decoded.led.breathe_speed
       end
       render()
     end,
