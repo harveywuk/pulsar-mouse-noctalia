@@ -35,11 +35,13 @@
 -- same - picking a profile in the UI calls --active-profile, not just a
 -- local view change, so every field shown always belongs to one coherent
 -- profile). Starts at 1 as a bootstrap placeholder only - the first
--- readStatus() call corrects it to whatever's actually active on the mouse
--- (see profileSynced below), since a physical profile button or Fusion on
--- another OS could have left a different profile active than this panel's
--- default guess.
+-- readStatus() call of each open corrects it to whatever's actually active
+-- on the mouse (see profileSynced below), since a physical profile button
+-- or Fusion on another OS could have left a different profile active than
+-- this panel's default guess, or than whatever it was last left showing.
 local profile = 1
+-- Cleared by onOpen() on every open, not just once per process - see the
+-- bootstrap block in readStatus().
 local profileSynced = false
 local numProfiles = 0
 local pollingRate = nil
@@ -604,13 +606,22 @@ local function readStatus()
         return
       end
       numProfiles = decoded.num_profiles or numProfiles
-      -- One-time bootstrap: this query targeted --profile {profile} (still
-      -- the placeholder 1 on first load), but decoded.active_profile is the
+      -- Once-per-open bootstrap: this query targeted --profile {profile}
+      -- (the value left over from the last time the panel was open, or the
+      -- placeholder 1 on first load), but decoded.active_profile is the
       -- ground truth of what's actually live on the mouse regardless of
       -- that. Resync `profile` to it and re-fetch once so every field below
-      -- reflects the real active profile from the start, not profile 1's
-      -- stored settings if a different one happens to be active - see
-      -- `profile`'s own comment above for why this can legitimately differ.
+      -- reflects the real active profile from the start, not some other
+      -- profile's stored settings - see `profile`'s own comment above for
+      -- why this can legitimately differ.
+      --
+      -- `profileSynced` is module-scoped and so survives the panel closing,
+      -- which used to make this a once-per-*process* bootstrap: only the
+      -- very first open ever re-synced. Switching profiles by any other
+      -- means afterwards (the physical profile button, `pulsar-mouse
+      -- --active-profile`, Fusion on another OS) then left every reopen
+      -- showing - and writing to - the stale profile this panel last knew
+      -- about. onOpen() clears the flag so each open re-syncs.
       if not profileSynced then
         profileSynced = true
         if decoded.active_profile ~= nil and decoded.active_profile ~= profile then
@@ -664,6 +675,14 @@ local function readStatus()
 end
 
 function onOpen(_context)
+  -- Re-arm the active-profile resync on every open, not just the first
+  -- one of the process - see readStatus()'s own comment for what went
+  -- wrong without this. Deliberately not reset anywhere else: by the time
+  -- onProfileChange runs, this open's resync has already happened, and
+  -- re-arming it there would let a not-yet-settled --status-json read
+  -- (still reporting the outgoing profile) undo the switch the user just
+  -- made.
+  profileSynced = false
   render() -- immediate placeholder while the read below is in flight
   readStatus()
 end
