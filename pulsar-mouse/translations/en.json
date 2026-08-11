@@ -4,6 +4,22 @@
       "label": "Color",
       "description": "Accent color for the percentage text and progress bar"
     },
+    "bar_color": {
+      "label": "Color",
+      "description": "Glyph color at a normal battery level, and on a wired mouse"
+    },
+    "charging_color": {
+      "label": "Charging Color",
+      "description": "Used while the mouse is charging"
+    },
+    "warning_color": {
+      "label": "Low Battery Color",
+      "description": "Used at or below the mouse's Low Power Mode threshold"
+    },
+    "error_color": {
+      "label": "Error Color",
+      "description": "Used when the mouse or the pulsar-mouse CLI can't be found"
+    },
     "show_progress": {
       "label": "Show Progress Bar"
     },
